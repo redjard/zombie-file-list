@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+# should be a filesystem root
+path="$1"
+
+# list zombie files (+L1) in "path", extract processIDs and loop over processes
+for pid in $(lsof +L1 "$path" | awk '{print $2}' | uniq); do
+	
+	# loop over all file descriptors of each relevant process
+	for fd in /proc/"$pid"/fd/*; do
+
+		# check for filedescriptors that are deleted and point to the relevant fs
+		readlink "$fd" | grep -qP '^'"$path"'.* \(deleted\)$' || continue
+		
+		echo -ne "${fd}:\t"
+
+		# get filesize by reading it all, since stat etc. don't work
+		numfmt --to=iec-i --suffix=B --format="%10.2f" $( cat "$fd" | wc -c )
+	done
+	
+done
